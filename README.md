@@ -1,4 +1,4 @@
-# PK WealthPulse — License Revocation List
+# FINUFF — License Revocation List
 
 Public by design. This repo exists solely so the app can fetch `revoked.json`
 unauthenticated at runtime via `raw.githubusercontent.com` (same pattern as
