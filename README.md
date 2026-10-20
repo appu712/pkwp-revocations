@@ -6,23 +6,33 @@ the `mutualfundslogo` asset repo).
 
 ## What's in it
 
-`revoked.json` — a flat array of entries, one per expired PAN (single
+`revoked.json` — a flat array of entries, one per expired identity (single
 state, no revoked/paused distinction):
 
 ```json
-[{"h": "<sha256 hex of the customer's PAN>", "at": 1751500000000}]
+[{"h": "<sha256 hex of the identity claim>", "at": 1751500000000}]
 ```
 
+`h` is the SHA-256 of the licence holder's identity claim after trimming and
+upper-casing it. For licences issued today (v2, `PKWP2.…` keys) the claim is
+the **login email / account ID**; for legacy licences it was the **PAN**.
+
 `at` is a cutoff timestamp, not a permanent ban: the app blocks any license
-for that PAN with an `issued` time **at or before** `at`, but a license
+for that identity with an `issued` time **at or before** `at`, but a license
 issued **after** `at` is honored normally. This is what makes "generate the
 customer a new license" the actual way back in — a fresh license naturally
 has a later `issued` timestamp than any past expiry, so it isn't blocked,
 with no separate restore step needed.
 
-Only SHA-256 hashes of PANs are stored, never raw PANs or any other
-identifying customer data. That said, an unsalted SHA-256 of a PAN is not
-strong protection on its own: Indian PANs follow a fixed, low-entropy
+Only SHA-256 hashes are stored, never raw PANs, emails or any other
+identifying customer data. That said, an unsalted SHA-256 is not strong
+protection on its own. **Emails (the v2 claim) are easy to guess or look up
+in a dictionary**, so anyone who already knows an email can test whether its
+hash is on this list, and the `at` timestamp shows roughly when that customer's
+licence was expired. Treat the list as "obscured, not private". A salted or
+server-side list would need an app change and a migration, so the format is
+deliberately unchanged for now. For legacy PANs the same applies: Indian
+PANs follow a fixed, low-entropy
 structure (5 letters + 4 digits + 1 check letter, with the 4th letter fixed
 by holder type and the 5th by surname initial), so for a guessed surname
 initial and the common "individual" holder type, the unknown space collapses
@@ -54,15 +64,28 @@ that repo — never committed, same treatment as the license-signing key.
 
 ## How the app uses it
 
-The app checks this file **before** granting dashboard access (both PAN+Name
-and credential login), not just afterward — fetches `revoked.json` and
-`revoked.sig` together, verifies the signature against the public key
-embedded in the app, and only then hashes the PAN being signed in and
-checks it against the list for a match. If there's a matching entry, it
-compares the license's own `issued` time against that entry's `at` cutoff
-(see above). It also re-checks periodically while a session is already
-open, as a safety net for access that gets expired mid-session. If the
-fetch fails (offline) or the signature doesn't verify, the check is
-skipped — it never blocks login on a failed network request or a
-verification miss, it only ever blocks on a genuine, correctly-signed
-revocation match.
+The app checks this file **before** granting dashboard access (every kind of
+sign-in), not just afterward — fetches `revoked.json` and `revoked.sig`
+together, verifies the signature against the public key embedded in the app,
+and only then hashes the identity being signed in (email/account ID, or PAN
+for a legacy licence) and checks it against the list for a match. If there's
+a matching entry, it compares the license's own `issued` time against that
+entry's `at` cutoff (see above). It re-checks periodically while a session is
+already open, as a safety net for access that gets expired mid-session.
+
+Behaviour when the list can't be used: a correctly-signed list is cached
+(in memory for about 30 minutes, and on disk), and a rollback guard refuses
+any signed list whose newest timestamp is older than the newest one already
+seen. If the fetch fails (offline) the app uses the last verified cached list;
+with **no** cached list yet (a first run that is offline) or a signature that
+doesn't verify, nothing is blocked — it never blocks login on a failed network
+request or a verification miss, it only ever blocks on a genuine,
+correctly-signed revocation match. This fail-open choice is deliberate.
+
+## Verifying the published list
+
+`node verify-revocations.js` is a read-only check (it never signs or writes): it fetches the live `revoked.json` and `revoked.sig`
+from the URLs the app uses and confirms the signature verifies over the exact bytes with the app's public key and that the list has the
+expected shape. `--local` checks the files in this folder, `--check-app <path to src-tauri/src/license.rs>` also confirms the key
+matches the one compiled into the app, and `--selftest` proves the checker itself rejects tampered or malformed input. Run it after
+every update to the list. Backup and recovery of the signing keys is described in the LicenseGenerator repo (`BACKUP-AND-RECOVERY.md`).
