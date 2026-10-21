@@ -37,16 +37,10 @@ protection on its own. **Privacy properties of this public list:**
   and a migration that keeps existing licences working. It is a planned privacy
   improvement; the format is deliberately unchanged until then.
 
-For legacy PANs the same applies: Indian
-PANs follow a fixed, low-entropy
-structure (5 letters + 4 digits + 1 check letter, with the 4th letter fixed
-by holder type and the 5th by surname initial), so for a guessed surname
-initial and the common "individual" holder type, the unknown space collapses
-to a brute-forceable few hundred million combinations — and the hash is also
-checkable against any previously-leaked PAN database. Treat this list as
-"obscured, not cryptographically irreversible": it doesn't hand out a PAN
-directly, but a motivated party can often determine which real customers are
-on it.
+Legacy licences may use hashes derived from PAN values. Because the possible
+input space is limited, these hashes should not be treated as confidential
+identifiers. The legacy format remains supported for compatibility while a
+migration path is evaluated.
 
 `revoked.sig` — a detached ECDSA P-256/SHA-256 signature (base64) over the
 exact bytes of `revoked.json`, signed with a keypair dedicated to this list
