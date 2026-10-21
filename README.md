@@ -26,12 +26,18 @@ with no separate restore step needed.
 
 Only SHA-256 hashes are stored, never raw PANs, emails or any other
 identifying customer data. That said, an unsalted SHA-256 is not strong
-protection on its own. **Emails (the v2 claim) are easy to guess or look up
-in a dictionary**, so anyone who already knows an email can test whether its
-hash is on this list, and the `at` timestamp shows roughly when that customer's
-licence was expired. Treat the list as "obscured, not private". A salted or
-server-side list would need an app change and a migration, so the format is
-deliberately unchanged for now. For legacy PANs the same applies: Indian
+protection on its own. **Privacy properties of this public list:**
+
+- The hashes give obscurity, not confidentiality. Someone who already holds a
+  candidate email (or account ID) can hash it and check whether it is listed;
+  the list does not reveal identities to someone who has no candidate.
+- Each entry's `at` timestamp is public, so a match also shows approximately
+  when that licence was expired or re-issued.
+- A salted or server-side check would improve this, but it needs an app change
+  and a migration that keeps existing licences working. It is a planned privacy
+  improvement; the format is deliberately unchanged until then.
+
+For legacy PANs the same applies: Indian
 PANs follow a fixed, low-entropy
 structure (5 letters + 4 digits + 1 check letter, with the 4th letter fixed
 by holder type and the 5th by surname initial), so for a guessed surname
@@ -76,11 +82,16 @@ already open, as a safety net for access that gets expired mid-session.
 Behaviour when the list can't be used: a correctly-signed list is cached
 (in memory for about 30 minutes, and on disk), and a rollback guard refuses
 any signed list whose newest timestamp is older than the newest one already
-seen. If the fetch fails (offline) the app uses the last verified cached list;
-with **no** cached list yet (a first run that is offline) or a signature that
-doesn't verify, nothing is blocked — it never blocks login on a failed network
-request or a verification miss, it only ever blocks on a genuine,
-correctly-signed revocation match. This fail-open choice is deliberate.
+seen. If the fetch fails (offline) the app uses the last verified cached list.
+With no usable verified list (for example a first run that is offline, or a
+list whose signature does not verify) the app does not block sign-in; it only
+blocks on a correctly-signed revocation match.
+
+This is a deliberate availability-over-enforcement trade-off: a network or
+hosting problem never locks paying customers out, at the cost that a revocation
+cannot be enforced on a device that has no verified list. A maximum-staleness
+(freshness) policy for the cached list has not been defined yet; until one is
+approved and implemented, this behaviour is unchanged.
 
 ## Verifying the published list
 
